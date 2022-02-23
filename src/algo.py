@@ -168,8 +168,22 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
 # session.query(Article).filter(Article.id.in_(("123","456","53e997e8b7602d9701fe00d3"))).all()
 # our_user = session.query(Article).filter_by(doi = '10.1109/TBCAS.2011.2159859').first()
 # print(our_user._repr_())
-
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
+    '''
+    
+
+    Parameters
+    ----------
+    L_id : list, optional
+        list of articles_id. The default is ["53e997e8b7602d9701fe00d3"].
+
+    Returns
+    -------
+    dic_cite : dictionnary
+        key : articles
+        values: number of citations in common
+
+    '''
     articles = art_id(L_id)
     voisins_art =  voisins(articles) - articles
     dic_cite = {}
@@ -180,10 +194,26 @@ def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
                 dic_cite[y] = 1
             else:
                 dic_cite[y] += 1
+    dic_cite = dict(sorted(dic_cite.items(), key=lambda item: item[1]))
     return dic_cite
 
 
 def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
+    '''
+    
+
+    Parameters
+    ----------
+    L_id : list, optional
+        list of articles_id. The default is ["53e997e8b7602d9701fe00d3"].
+
+    Returns
+    -------
+    dic_aut : dictionnary
+        key : articles
+        values: number of authors in common
+
+    '''
     articles = art_id(L_id)
     L_authors = []
     for x in articles:
@@ -198,9 +228,10 @@ def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
                 dic_aut[y] = 1
             else:
                 dic_aut[y] += 1
-    dic_aut = dict(sorted(x.items(), key=lambda item: item[1]))
+    dic_aut = dict(sorted(dic_aut.items(), key=lambda item: item[1]))
     for key in dic_aut.keys():
-        if key in L_id:
+        if key in articles:
             dic_aut.pop(key, None)
     return dic_aut
+
 
