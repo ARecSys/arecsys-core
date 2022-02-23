@@ -169,4 +169,38 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
 # our_user = session.query(Article).filter_by(doi = '10.1109/TBCAS.2011.2159859').first()
 # print(our_user._repr_())
 
+def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
+    articles = art_id(L_id)
+    voisins_art =  voisins(articles) - articles
+    dic_cite = {}
+    for x in voisins_art:
+        our_articles = session.query(Article).filter(Article.references.contains(x)).all()
+        for y in our_articles:
+            if y not in dic_cite.keys():
+                dic_cite[y] = 1
+            else:
+                dic_cite[y] += 1
+    return dic_cite
+
+
+def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
+    articles = art_id(L_id)
+    L_authors = []
+    for x in articles:
+        L_authors += x.authors
+    L_authors = list(set(L_authors))
+    dic_aut = {}
+    for y in L_authors:
+        
+        our_articles = session.query(Article).filter(Article.authors.contains(y)).all()
+        for z in our_articles:
+            if z not in dic_aut.keys():
+                dic_aut[y] = 1
+            else:
+                dic_aut[y] += 1
+    dic_aut = dict(sorted(x.items(), key=lambda item: item[1]))
+    for key in dic_aut.keys():
+        if key in L_id:
+            dic_aut.pop(key, None)
+    return dic_aut
 
