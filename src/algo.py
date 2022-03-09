@@ -1,6 +1,6 @@
 from tokenize import String
 import json
-from sqlalchemy import create_engine, Column, Integer, ARRAY, String, MetaData, Table
+from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -9,11 +9,12 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import os
 
+from sqlalchemy.dialects.postgresql import ARRAY
 # Update connection string information
 hostname = os.environ["DB_HOSTNAME"]
 dbname = os.environ["DB_NAME"]
 user = os.environ["DB_USER"]
-password = os.environ["DB_PASSWORD"]
+password = 'NTQ2MjgxZmI5OTRlZjM5MzYwYjE3OGQz'
 
 Base = declarative_base()
 
@@ -27,7 +28,7 @@ database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}?sslmod
 engine = create_engine(database_uri)
 
 session = Session(engine)
- 
+
 class Article(Base):
     __tablename__ = 'articles_metadata'
 
@@ -51,7 +52,6 @@ class Article(Base):
     def __repr__(self):
         return "<Article(doi='%s', id='%s', title='%s', authors='%s', references='%s')>" % (
                                 self.doi, self.id, self.title, self.authors, self.references )
-
 
 def ask_doi():
     '''
@@ -155,19 +155,17 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
     res_id = sorted(pr, key=pr.get, reverse = True)[:5]
     res_score = [pr[_] for _ in res_id]
     res = art_id(res_id)
-    print(type(res))
     # print(res_id)
     # print(res_score)
-    # print("Here is the top 5 articles recommended\n")
-    # for x in res:
-    #     print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
-    return res
-      
-#%%
-# session = Session(engine) 
-# session.query(Article).filter(Article.id.in_(("123","456","53e997e8b7602d9701fe00d3"))).all()
-# our_user = session.query(Article).filter_by(doi = '10.1109/TBCAS.2011.2159859').first()
-# print(our_user._repr_())
+    #print("Here is the top 5 articles recommended\n")
+    #for x in res:
+    #   print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
+    return sorted(pr, key=pr.get, reverse = True)
+
+
+
+
+
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
     '''
     
@@ -185,10 +183,10 @@ def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
 
     '''
     articles = art_id(L_id)
-    voisins_art =  voisins(articles) - articles
+    voisins_art =  [x for x  in voisins(articles) if x not in articles]
     dic_cite = {}
     for x in voisins_art:
-        our_articles = session.query(Article).filter(Article.references.contains(x)).all()
+        our_articles = session.query(Article).filter(Article.references.contains({x.id})).all()
         for y in our_articles:
             if y not in dic_cite.keys():
                 dic_cite[y] = 1
@@ -211,7 +209,7 @@ def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
     -------
     dic_aut : dictionnary
         key : articles
-        values: number of authors in common
+        values: number of authors in common for L_id
 
     '''
     articles = art_id(L_id)
@@ -222,16 +220,82 @@ def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
     dic_aut = {}
     for y in L_authors:
         
-        our_articles = session.query(Article).filter(Article.authors.contains(y)).all()
+        our_articles = session.query(Article).filter(Article.authors.contains({y})).all()
         for z in our_articles:
             if z not in dic_aut.keys():
-                dic_aut[y] = 1
+                dic_aut[z] = 1
             else:
-                dic_aut[y] += 1
+                dic_aut[z] += 1
     dic_aut = dict(sorted(dic_aut.items(), key=lambda item: item[1]))
     for key in dic_aut.keys():
-        if key in articles:
+        if key in L_authors:
             dic_aut.pop(key, None)
     return dic_aut
+def normalise(D):
+    '''
+    
 
+    Parameters
+    ----------
+    D : dict
+        DESCRIPTION.
 
+    Returns
+    -------
+    None.
+    Modify in place the dict by the sum of all values
+    '''
+    factor=1.0/sum(D.itervalues())
+    for k in D:
+        D[k] = D[k]*factor
+        
+def overall_score(L_id = ["53e997e8b7602d9701fe00d3"], i_cocite = 0.2, i_coaut= 0.6, i_graph = 0.2):
+    '''
+    
+
+    Parameters
+    ----------
+    L_id : TYPE, optional
+        DESCRIPTION. The default is ["53e997e8b7602d9701fe00d3"].
+    i_cocite : TYPE, optional
+        DESCRIPTION. The default is 0.4.
+    i_coaut : TYPE, optional
+        DESCRIPTION. The default is 0.4.
+    i_graph : TYPE, optional
+        DESCRIPTION. The default is 0.2.
+
+    Returns
+    -------
+    Overall score of the 
+
+    '''
+    
+            
+            
+    dic_aut = co_authors(L_id)
+    dic_cite = co_citation(L_id)
+    dic_graph = algofst(L_id)
+    
+    
+    
+    keys = list(dic_aut.keys()) + list(dic_cite.keys()) + list(dic_graph.keys())
+    keys = list(set(keys))
+    dic_res = {}
+    normalise(dic_cite)
+    normalise(dic_aut)
+    normalise(dic_graph)
+    for x in keys:
+        dic_res[x] = 0
+        if x.id in dic_cite.keys():
+            dic_res[x.id] += dic_cite[x]
+        if x.id in dic_aut.keys():
+            dic_res[x.id] += dic_aut[x]
+        if x in dic_graph.keys():
+            dic_res[x] += dic_graph[x]
+            
+    dic_res = dict(sorted(dic_res.items(), key=lambda item: item[1]))
+    
+    return dic_res
+            
+    
+    
