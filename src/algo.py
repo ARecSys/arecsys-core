@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 hostname = os.environ["DB_HOSTNAME"]
 dbname = os.environ["DB_NAME"]
 user = os.environ["DB_USER"]
-password = 'NTQ2MjgxZmI5OTRlZjM5MzYwYjE3OGQz'
+password = os.environ["DB_PASSWORD"]
 
 Base = declarative_base()
 
