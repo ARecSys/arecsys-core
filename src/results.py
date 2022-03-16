@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 import os
 import uuid
 
-from src.algo import algofst, art_doi, art_id
+from algo import algofst, art_doi, art_id
 
 Base = declarative_base()
 # Update connection string information
@@ -40,15 +40,14 @@ class Favorite( Base ):
         }
 
 class Results( Base ):
-    __tablename__ = 'results'
-    id = db.Column(db.String(100), primary_key = True) 
-    user_id = db.Column(db.String(100)) 
-    article_id = db.Column(db.String(100))
+    __tablename__ = 'results_algofst'
+    user_id = db.Column( db.String(100), primary_key = True ) 
+    results = db.Column( db.ARRAY(db.String) )
 
     def serialize(self):
         return { 
             "user" : self.user_id, 
-            "article_id" : self.article_id,
+            "results" : self.results,
         }
 
 def get_favorites( user ):
@@ -70,17 +69,15 @@ def publish_recos_in_db( user, recos ):
     
     session = Session(engine)
     
-    session.query( Results ).filter( Results.user_id == user ).delete()
-    session.commit()
+    result_by_user = session.query( Results ).filter( Results.user_id == user ).first()
 
-    L_articles = art_id( recos )
-
-    for article in L_articles:
-
-        rst = Results( 
-            id = str(uuid.uuid4()), 
+    if result_by_user:
+        result_by_user.results = recos
+    
+    else:
+        rst = Results(
             user_id = user, 
-            article_id = article.doi
+            results = recos
         ) 
 
         session.add( rst ) 
