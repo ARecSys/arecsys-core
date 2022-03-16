@@ -8,6 +8,4 @@ COPY /src/ /src/
 
 RUN pip install -r requirements.txt
 
-EXPOSE 6000
-
-ENTRYPOINT [ "gunicorn", "--bind=0.0.0.0:6000", "--timeout", "600", "app:app" ]
+ENTRYPOINT [ "python", "app.py" ]

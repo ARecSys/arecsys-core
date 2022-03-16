@@ -1,20 +1,36 @@
-from flask import Flask, jsonify
-from flask import request
-from flask_cors import CORS
-import os
+# import azure.functions as func
+import base64
+import logging
 
-app = Flask(__name__)
-CORS(app)
- 
-@app.route('/api/core/rec', methods =['GET']) 
-def get_rec_from_doi():
+from results import get_favorites, compute_reco, publish_recos_in_db
+import pika, os, time
 
-    data = request.get_json()
-
-    if "doi" in data:
-        from algo import algofst
-        res = algofst( data["doi"] )
-        
-        return jsonify( [ art.toJson() for art in res ] )
+def algofst_process_function( msg ):
     
-    return "Error"
+    user = msg.decode("utf-8")
+
+    favorites = get_favorites( user )
+
+    recos = compute_reco( favorites )
+    
+    publish_recos_in_db( user, recos )
+
+# Access the CLODUAMQP_URL environment variable
+url = os.environ["AMQP_URL"]
+queue_name = "algofst_process"
+
+params = pika.URLParameters( url )
+connection = pika.BlockingConnection( params )
+channel = connection.channel() # start a channel
+channel.queue_declare( queue = queue_name ) # Declare a queue
+
+# create a function which is called on incoming messages
+def callback(ch, method, properties, body):
+    algofst_process_function(body)
+
+# set up subscription on the queue
+channel.basic_consume( queue_name, callback, auto_ack = True)
+
+# start consuming (blocks)
+channel.start_consuming()
+connection.close()
