@@ -193,7 +193,10 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
         node_size = liste_size)
     
     plt.show()
-    return res_G,res
+    L_nodes = res_G.nodes
+    L_edges = res_G.edges
+    
+    return L_nodes,L_edges,liste_size,liste_color,res
 
 
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
