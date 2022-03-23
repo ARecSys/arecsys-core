@@ -114,7 +114,8 @@ def voisins(L):
     
     return res
 
-def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
+
+def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisins = 2):
     '''
     Input : 
         L_id a list of id of the articles read
@@ -125,13 +126,16 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
     Returns
     -------
     Return None
-    Print the top 5 articles
+    Print the top 10 articles with their scores and the associated graph
 
     '''
-    articles = art_id(L_id)
-    voisins_art =  voisins(voisins(articles))
+    articles_dep = art_id(L_id)
+    articles = articles_dep
+    for i in range(dist_voisins):
+        articles = voisins(articles)
+    
     #print(len(voisins_art))
-    voisins_art = list(set(voisins_art)) #unique articles
+    voisins_art = list(set(articles)) #unique articles
     #print(voisins_art)
     G = nx.DiGraph()
     liste_sommet = [x.id for x in voisins_art]
@@ -141,29 +145,55 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
         if art.references is not None:
             for ref in art.references:
                 if ref in liste_sommet:
-                    G.add_edge(art.id , ref )
+                    #print(art.id, ref)
+                    G.add_node(ref)
+                    G.add_edge(art.id, ref )
 
     # print("liste_ref",liste_ref)
     # print("liste_sommet", liste_sommet)
     if draw_graph:
-        nx.draw(G, with_labels=True)#, labels=labels)
+        nx.draw(G, with_labels=True, arrowsize = 30, width = 2)#, labels=labels)
+        
         plt.show()
     pr = nx.pagerank(G)
     ### Delete the ranking of the already read papers
     for article_input in L_id:
         pr.pop(article_input, None)
-    res_id = sorted(pr, key=pr.get, reverse = True)[:5]
+    res_id = sorted(pr, key=pr.get, reverse = True)[:10]
     res_score = [pr[_] for _ in res_id]
-    res = art_id(res_id)
+    res = art_id(res_id) 
+    
     # print(res_id)
     # print(res_score)
     #print("Here is the top 5 articles recommended\n")
     #for x in res:
-    #   print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
-    return sorted(pr, key=pr.get, reverse = True)
-
-
-
+    #    print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
+    
+    for y in pr.keys():
+        
+        pr[y] *= (10 / sum(res_score) )
+    res += articles_dep
+    res_G = nx.DiGraph()
+    liste_res =   [x.id for x in res]
+    for art in res:
+        res_G.add_node(art.id)
+        if art.references is not None:
+            for ref in art.references:
+                if ref in liste_res:
+                    #print(art.id, ref)
+                    
+                    res_G.add_node(ref)
+                    res_G.add_edge(art.id, ref )
+    liste_color = ['blue' if art in articles_dep else 'green' for art in res]
+    liste_size = [300 if art in articles_dep else 300 * pr[art.id] for art in res ]
+    nx.draw_networkx(
+        res_G,
+        pos=nx.spring_layout(res_G),
+        node_color = liste_color,
+        node_size = liste_size)
+    
+    plt.show()
+    return res_G,res
 
 
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
