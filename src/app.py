@@ -1,36 +1,42 @@
-# import azure.functions as func
+from azure.storage.queue import ( QueueClient, BinaryBase64EncodePolicy, BinaryBase64DecodePolicy )
 import base64
-import logging
-
+import os
 from results import get_favorites, compute_reco, publish_recos_in_db
-import pika, os, time
+import time
 
-def algofst_process_function( msg ):
+# Retrieve the connection string from an environment
+# variable named AZURE_STORAGE_CONNECTION_STRING
+connect_str = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
+
+# Create a unique name for the queue
+q_name = "algofst"
+
+# Instantiate a QueueClient object which will
+# be used to create and manipulate the queue
+
+queue_client = QueueClient.from_connection_string(
+                            connect_str, 
+                            q_name,
+                            message_encode_policy = BinaryBase64EncodePolicy(),
+                            message_decode_policy = BinaryBase64DecodePolicy()
+                        )
+
+while True:
     
-    user = msg.decode("utf-8")
+    message = queue_client.receive_message()
 
-    favorites = get_favorites( user )
-
-    recos = compute_reco( favorites )
+    if message:
     
-    publish_recos_in_db( user, recos )
+        user_public_id = base64.b64decode( message.content ).decode("utf-8")
 
-# Access the CLODUAMQP_URL environment variable
-url = os.environ["AMQP_URL"]
-queue_name = "algofst_process"
+        favorites = get_favorites( user_public_id )
 
-params = pika.URLParameters( url )
-connection = pika.BlockingConnection( params )
-channel = connection.channel() # start a channel
-channel.queue_declare( queue = queue_name ) # Declare a queue
+        if favorites != []:
 
-# create a function which is called on incoming messages
-def callback(ch, method, properties, body):
-    algofst_process_function(body)
+            recos = compute_reco( favorites )
 
-# set up subscription on the queue
-channel.basic_consume( queue_name, callback, auto_ack = True)
-
-# start consuming (blocks)
-channel.start_consuming()
-connection.close()
+            publish_recos_in_db( user_public_id, recos )
+        
+        queue_client.delete_message( message.id, message.pop_receipt )
+    
+    time.sleep( 60 )
