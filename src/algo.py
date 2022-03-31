@@ -4,17 +4,21 @@ from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import ARRAY
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import os
+from dotenv import load_dotenv
 
-from sqlalchemy.dialects.postgresql import ARRAY
+load_dotenv()
+
+
 # Update connection string information
-hostname = os.environ["DB_HOSTNAME"]
-dbname = os.environ["DB_NAME"]
-user = os.environ["DB_USER"]
-password = os.environ["DB_PASSWORD"]
+hostname = os.getenv("DB_HOSTNAME")
+dbname = os.getenv("DB_NAME")
+user = os.getenv("DB_USER")
+password = os.getenv("DB_PASSWORD")
 
 Base = declarative_base()
 
@@ -134,6 +138,9 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
     Compute the pagerank algorithm on this set
     
     Returns
+
+    Output  :
+        Return a dict.
     -------
     
     Print the top 10 articles with their scores and the associated graph
@@ -203,17 +210,25 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
                     res_G.add_edge(art.id, ref )
     liste_color = ['blue' if art in articles_dep else 'green' for art in res]
     liste_size = [300 if art in articles_dep else 300 * pr[art.id] for art in res ]
-    nx.draw_networkx(
-        res_G,
-        pos=nx.spring_layout(res_G),
-        node_color = liste_color,
-        node_size = liste_size)
-    
-    plt.show()
+    if draw_graph:
+        nx.draw_networkx(
+            res_G,
+            pos=nx.spring_layout(res_G),
+            node_color = liste_color,
+            node_size = liste_size)
+        
+        plt.show()
     L_nodes = res_G.nodes
     L_edges = res_G.edges
+
+    print(pr)
+
+    recommandation_ouput = {}
+    recommandation_ouput["nodes"] = list(L_nodes)
+    recommandation_ouput["edges"] = list(L_edges)
+    recommandation_ouput["scores"] = pr
     
-    return res,L_nodes,L_edges,liste_size,liste_color
+    return recommandation_ouput
 
 
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
@@ -349,3 +364,4 @@ def overall_score(L_id = ["53e997e8b7602d9701fe00d3"], i_cocite = 0.2, i_coaut= 
             
     
     
+print(algofst())

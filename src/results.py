@@ -39,15 +39,19 @@ class Favorite( Base ):
             "title" : self.title
         }
 
-class Results( Base ):
+class Recommandation( Base ):
     __tablename__ = 'results_algofst'
     user_id = db.Column( db.String(100), primary_key = True ) 
-    results = db.Column( db.ARRAY(db.String) )
+    nodes = db.Column( db.ARRAY(db.String) )
+    edges = db.Column(db.String)
+    scores = db.Column(db.String)
 
     def serialize(self):
         return { 
             "user" : self.user_id, 
-            "results" : self.results,
+            "nodes" : self.nodes,
+            "edges" : self.edges,
+            "scores" : self.scores,
         }
 
 def get_favorites( user ):
@@ -65,19 +69,23 @@ def compute_reco ( favorites ):
 
     return algofst( ids )
 
-def publish_recos_in_db( user, recos ):
+def publish_recos_in_db( user, recommandation_dict ):
     
     session = Session(engine)
     
-    result_by_user = session.query( Results ).filter( Results.user_id == user ).first()
+    result_by_user = session.query( Recommandation ).filter( Recommandation.user_id == user ).first()
 
     if result_by_user:
-        result_by_user.results = recos
+        result_by_user.edges = recommandation_dict["edges"]
+        result_by_user.nodes = recommandation_dict["nodes"]
+        result_by_user.scores = recommandation_dict["scores"]
     
     else:
-        rst = Results(
+        rst = Recommandation(
             user_id = user, 
-            results = recos
+            edges = recommandation_dict["edges"],
+            nodes = recommandation_dict["nodes"],
+            scores = recommandation_dict["scores"]
         ) 
 
         session.add( rst ) 
