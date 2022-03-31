@@ -55,11 +55,14 @@ class Article(Base):
 
 def ask_doi():
     '''
-    Ask the user the doi of the papers SEPARATED BY SPACE    
+    Ask the user the doi of the papers SEPARATED BY SPACE 
+    Input type : None 
+    Ask type : string
+    
     Returns
     -------
-    List of the articles of these doi
-
+    List of the articles of these doi 
+    output type : articles
 
     '''
     L = []
@@ -73,11 +76,13 @@ def ask_doi():
     return L
 def art_id(L_id = ["53e997e8b7602d9701fe00d3"]):
     '''
+
     L_id is a list of the ID (primary key) of the papers
+    Input type : list of strings
     Returns
     -------
     List of the corresponding articles (objects)
-
+    Output type : list of articles
 
     '''
     our_articles = session.query(Article).filter(Article.id.in_(tuple(L_id))).all()
@@ -85,10 +90,11 @@ def art_id(L_id = ["53e997e8b7602d9701fe00d3"]):
 def art_doi(L_doi = ['10.1109/TBCAS.2011.2159859']):
      '''
      L_doi is a list of the DOI (primary key) of the papers
+     Input type: list of String
      Returns
      -------
      List of the corresponding articles (objects)
-
+    Output type : Articles
 
      '''
      our_articles = session.query(Article).filter(Article.doi.in_(tuple(L_doi))).all()
@@ -98,9 +104,11 @@ def art_doi(L_doi = ['10.1109/TBCAS.2011.2159859']):
 def voisins(L):
     '''
     
-    L list of articles (object)
+    L :  list of articles (class articles)
+    Input type : list of articles
     Returns
     -------
+    Output type : list of articles
     Table of the references of these articles (objects)
     
     '''
@@ -114,24 +122,37 @@ def voisins(L):
     
     return res
 
-def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
+
+def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisins = 2):
     '''
     Input : 
-        L_id a list of id of the articles read
+        L_id a list of id of the articles read (list of strings)
+        draw_graph : Whether to draw the graph in matplotlib (bool)
+        dist_voisins : depth of references explored (int)
         
-    Generate a graph of the friends of the friends of the friends
+    Generate a graph of the friends of the friends of the friends (depth = dist_voisins)
     Compute the pagerank algorithm on this set
-
+    
     Returns
     -------
-    Return None
-    Print the top 5 articles
-
+    
+    Print the top 10 articles with their scores and the associated graph
+    The more important the article is according to page rank, the bigger its node will be
+    The articles given at first to do the recommendation are in blue whereas the others are in green
+    
+    res : dictionnary (key : article, value : score of the algorithm)
+    L_nodes : list of nodes (list of  NodeDataView objects)
+    L_edges : list of edges (list of EdgeDataView objects )
+    liste_size : list of floats
+    liste_color : list of strings
     '''
-    articles = art_id(L_id)
-    voisins_art =  voisins(voisins(articles))
+    articles_dep = art_id(L_id)
+    articles = articles_dep
+    for i in range(dist_voisins):
+        articles = voisins(articles)
+    
     #print(len(voisins_art))
-    voisins_art = list(set(voisins_art)) #unique articles
+    voisins_art = list(set(articles)) #unique articles
     #print(voisins_art)
     G = nx.DiGraph()
     liste_sommet = [x.id for x in voisins_art]
@@ -141,29 +162,58 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False):
         if art.references is not None:
             for ref in art.references:
                 if ref in liste_sommet:
-                    G.add_edge(art.id , ref )
+                    #print(art.id, ref)
+                    G.add_node(ref)
+                    G.add_edge(art.id, ref )
 
     # print("liste_ref",liste_ref)
     # print("liste_sommet", liste_sommet)
     if draw_graph:
-        nx.draw(G, with_labels=True)#, labels=labels)
+        nx.draw(G, with_labels=True, arrowsize = 30, width = 2)#, labels=labels)
+        
         plt.show()
     pr = nx.pagerank(G)
     ### Delete the ranking of the already read papers
     for article_input in L_id:
         pr.pop(article_input, None)
-    res_id = sorted(pr, key=pr.get, reverse = True)[:5]
+    res_id = sorted(pr, key=pr.get, reverse = True)[:10]
     res_score = [pr[_] for _ in res_id]
-    res = art_id(res_id)
+    res = art_id(res_id) 
+    
     # print(res_id)
     # print(res_score)
     #print("Here is the top 5 articles recommended\n")
     #for x in res:
-    #   print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
-    return sorted(pr, key=pr.get, reverse = True)
-
-
-
+    #    print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
+    
+    for y in pr.keys():
+        
+        pr[y] *= (10 / sum(res_score) )
+    res += articles_dep
+    res_G = nx.DiGraph()
+    liste_res =   [x.id for x in res]
+    for art in res:
+        res_G.add_node(art.id)
+        if art.references is not None:
+            for ref in art.references:
+                if ref in liste_res:
+                    #print(art.id, ref)
+                    
+                    res_G.add_node(ref)
+                    res_G.add_edge(art.id, ref )
+    liste_color = ['blue' if art in articles_dep else 'green' for art in res]
+    liste_size = [300 if art in articles_dep else 300 * pr[art.id] for art in res ]
+    nx.draw_networkx(
+        res_G,
+        pos=nx.spring_layout(res_G),
+        node_color = liste_color,
+        node_size = liste_size)
+    
+    plt.show()
+    L_nodes = res_G.nodes
+    L_edges = res_G.edges
+    
+    return res,L_nodes,L_edges,liste_size,liste_color
 
 
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
@@ -172,14 +222,14 @@ def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
 
     Parameters
     ----------
-    L_id : list, optional
+    L_id : list of string, optional
         list of articles_id. The default is ["53e997e8b7602d9701fe00d3"].
 
     Returns
     -------
     dic_cite : dictionnary
-        key : articles
-        values: number of citations in common
+        key : articles (of type articles)
+        values: number of citations in common (int)
 
     '''
     articles = art_id(L_id)
@@ -202,14 +252,14 @@ def co_authors(L_id = ["53e997e8b7602d9701fe00d3"]):
 
     Parameters
     ----------
-    L_id : list, optional
+    L_id : list of string, optional
         list of articles_id. The default is ["53e997e8b7602d9701fe00d3"].
 
     Returns
     -------
     dic_aut : dictionnary
-        key : articles
-        values: number of authors in common for L_id
+        key : articles of the class articles
+        values: number of authors in common for L_id (int)
 
     '''
     articles = art_id(L_id)
@@ -237,12 +287,12 @@ def normalise(D):
 
     Parameters
     ----------
-    D : dict
-        DESCRIPTION.
+    D : dict with values of type float
+        
 
     Returns
     -------
-    None.
+
     Modify in place the dict by the sum of all values
     '''
     factor=1.0/sum(D.itervalues())
@@ -255,26 +305,26 @@ def overall_score(L_id = ["53e997e8b7602d9701fe00d3"], i_cocite = 0.2, i_coaut= 
 
     Parameters
     ----------
-    L_id : TYPE, optional
-        DESCRIPTION. The default is ["53e997e8b7602d9701fe00d3"].
-    i_cocite : TYPE, optional
-        DESCRIPTION. The default is 0.4.
-    i_coaut : TYPE, optional
-        DESCRIPTION. The default is 0.4.
-    i_graph : TYPE, optional
-        DESCRIPTION. The default is 0.2.
+    L_id : list of strings, optional
+        list of articles ID. The default is ["53e997e8b7602d9701fe00d3"].
+    i_cocite : weight of the cocited algorithm (float), optional
+         The default is 0.4.
+    i_coaut : weight of the coauthors algorithm (float), optional
+         The default is 0.4.
+    i_graph : weight of the pagerank algorithm (float), optional
+         The default is 0.2.
 
     Returns
     -------
-    Overall score of the 
-
+    Overall score of the recommendation by all 3 methods combined.
+    dic_res : dictionnary of tuple (article (of type article), recommendation score(float))
     '''
     
             
             
     dic_aut = co_authors(L_id)
     dic_cite = co_citation(L_id)
-    dic_graph = algofst(L_id)
+    (dic_graph, L_nodes,L_edges,liste_size,liste_color) = algofst(L_id)
     
     
     
