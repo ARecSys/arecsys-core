@@ -138,13 +138,15 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
     
     Print the top 10 articles with their scores and the associated graph
     The more important the article is according to page rank, the bigger its node will be
-    The articles given at first to do the recommendation are in blue whereas the others are in green
     
-    res : dictionnary (key : article, value : score of the algorithm)
+    res : list of articles recommended with the input articles (type article)
+    res_score : list of scores of recommendation of the articles in res, 0 if in the input id
+    (type float)
     L_nodes : list of nodes (list of  NodeDataView objects)
     L_edges : list of edges (list of EdgeDataView objects )
-    liste_size : list of floats
-    liste_color : list of strings
+    liste_size : list of nodes sizes proportionnal to the score of the recommendation (type : float)
+    liste_color : list of color (type : string) (The articles given at first to do the 
+    recommendation are in blue whereas the others are in green)
     '''
     articles_dep = art_id(L_id)
     articles = articles_dep
@@ -179,9 +181,7 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
     res_id = sorted(pr, key=pr.get, reverse = True)[:10]
     res_score = [pr[_] for _ in res_id]
     res = art_id(res_id) 
-    
-    # print(res_id)
-    # print(res_score)
+
     #print("Here is the top 5 articles recommended\n")
     #for x in res:
     #    print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
@@ -209,11 +209,11 @@ def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisin
         node_color = liste_color,
         node_size = liste_size)
     
-    plt.show()
+    #plt.show()
     L_nodes = res_G.nodes
     L_edges = res_G.edges
-    
-    return res,L_nodes,L_edges,liste_size,liste_color
+    res_score =   [0 if art in articles_dep else pr[art.id] for art in res ]
+    return res,res_score,L_nodes,L_edges,liste_size,liste_color
 
 
 def co_citation(L_id = ["53e997e8b7602d9701fe00d3"]):
