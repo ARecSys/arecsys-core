@@ -1,54 +1,123 @@
-from models import Article
-from models import session
-
+from tokenize import String
+import json
+from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import ARRAY
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import json
+import os
+from dotenv import load_dotenv
 
-def art_id(L_id:list = ["53e997e8b7602d9701fe00d3"]):
+load_dotenv()
+
+
+# Update connection string information
+hostname = os.getenv("DB_HOSTNAME")
+dbname = os.getenv("DB_NAME")
+user = os.getenv("DB_USER")
+password = os.getenv("DB_PASSWORD")
+
+Base = declarative_base()
+
+database_uri = 'postgresql+psycopg2://{dbuser}:{dbpass}@{dbhost}/{dbname}?sslmode=require'.format(
+    dbuser=user,
+    dbpass=password,
+    dbhost=hostname,
+    dbname=dbname
+)
+
+engine = create_engine(database_uri)
+
+session = Session(engine)
+
+class Article(Base):
+    __tablename__ = 'articles_metadata'
+
+    id = Column(String(50), primary_key = True) 
+    doi = Column(String(100))
+    title = Column(String())
+    authors = Column(ARRAY(String))
+    keywords = Column(ARRAY(String))
+    fos =  Column(ARRAY(String))
+    references = Column(ARRAY(String))
+
+    def toJson(self):
+        return {
+            "doi" : self.doi, 
+            "id" : self.id,
+            "title" : self.title,
+            "authors" : self.authors,
+            "references": self.references
+        }
+        
+    def __repr__(self):
+        return "<Article(doi='%s', id='%s', title='%s', authors='%s', references='%s')>" % (
+                                self.doi, self.id, self.title, self.authors, self.references )
+
+def ask_doi():
     '''
-    Returns a list of the corresponding articles filtered by id.
-
-            Parameters:
-                    L_id (string[]): List of articles id.
-
-            Returns:
-                    out_articles (Articles[]): List of articles
-    '''
-
-    out_articles = session.query(Article).filter(Article.id.in_(tuple(L_id))).all()
+    Ask the user the doi of the papers SEPARATED BY SPACE 
+    Input type : None 
+    Ask type : string
     
-    return out_articles
+    Returns
+    -------
+    List of the articles of these doi 
+    output type : articles
 
-def art_doi(L_doi:list = ['10.1109/TBCAS.2011.2159859']):
     '''
-    Returns a list of the corresponding articles filtered by doi.
-
-            Parameters:
-                    L_doi (string[]): List of articles doi.
-
-            Returns:
-                    out_articles (Articles[]): List of articles
-    '''
-
-    out_articles = session.query(Article).filter(Article.doi.in_(tuple(L_doi))).all()
+    L = []
+    doi = str(input("Input the DOIs SEPARATED BY SPACE\n"))
+    doi = doi.split(" ")
     
-    return out_articles
+    for x in doi:
+        our_user = session.query(Article).filter_by(doi = str(x)).all()
+        L.append(our_user)
     
-def voisins(articles:list):
-    '''
-    Returns a list of neighboring articles.
-
-            Parameters:
-                    articles (Articles[]): List of articles.
-
-            Returns:
-                    res (Articles[]): List of articles
+    return L
+def art_id(L_id = ["53e997e8b7602d9701fe00d3"]):
     '''
 
-    neighbourhood2 = [article.id for article in articles]
-    for art in articles:
+    L_id is a list of the ID (primary key) of the papers
+    Input type : list of strings
+    Returns
+    -------
+    List of the corresponding articles (objects)
+    Output type : list of articles
+
+    '''
+    our_articles = session.query(Article).filter(Article.id.in_(tuple(L_id))).all()
+    return our_articles
+def art_doi(L_doi = ['10.1109/TBCAS.2011.2159859']):
+     '''
+     L_doi is a list of the DOI (primary key) of the papers
+     Input type: list of String
+     Returns
+     -------
+     List of the corresponding articles (objects)
+    Output type : Articles
+
+     '''
+     our_articles = session.query(Article).filter(Article.doi.in_(tuple(L_doi))).all()
+     return our_articles
+        
+    
+def voisins(L):
+    '''
+    
+    L :  list of articles (class articles)
+    Input type : list of articles
+    Returns
+    -------
+    Output type : list of articles
+    Table of the references of these articles (objects)
+    
+    '''
+    neighbourhood2 = [x.id for x in L]
+    for art in L:
         if art.references is not None:
             
             neighboorhood2 =  np.unique(neighbourhood2 + art.references)
@@ -58,31 +127,39 @@ def voisins(articles:list):
     return res
 
 
-def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, dist_voisins:int = 2):
+def algofst(L_id = ["53e997e8b7602d9701fe00d3"], draw_graph = False, dist_voisins = 2):
     '''
-    Generate a graph of the friends of the friends of the friends (depth = dist_voisins). Compute the pagerank algorithm on this set
-
-            Parameters:
-                    L_id (string[]): List of articles id.
-                    draw_graph (bool): Whether to draw the graph in matplotlib.
-                    dist_voisins (int): Depth of references explored.
-
-            Returns:
-                    recommandation_ouput (json): a graph in json format.
-
-                    recommandation_ouput = {
-                        "nodes": list,
-                        "edges": string,
-                        "score": string,
-                    }
+    Input : 
+        L_id a list of id of the articles read (list of strings)
+        draw_graph : Whether to draw the graph in matplotlib (bool)
+        dist_voisins : depth of references explored (int)
+        
+    Generate a graph of the friends of the friends of the friends (depth = dist_voisins)
+    Compute the pagerank algorithm on this set
+    
+    Returns
+    -------
+    
+    Print the top 10 articles with their scores and the associated graph
+    The more important the article is according to page rank, the bigger its node will be
+    
+    res : list of articles recommended with the input articles (type article)
+    res_score : list of scores of recommendation of the articles in res, 0 if in the input id
+    (type float)
+    L_nodes : list of nodes (list of  NodeDataView objects)
+    L_edges : list of edges (list of EdgeDataView objects )
+    liste_size : list of nodes sizes proportionnal to the score of the recommendation (type : float)
+    liste_color : list of color (type : string) (The articles given at first to do the 
+    recommendation are in blue whereas the others are in green)
     '''
-
     articles_dep = art_id(L_id)
     articles = articles_dep
     for i in range(dist_voisins):
         articles = voisins(articles)
     
+    #print(len(voisins_art))
     voisins_art = list(set(articles)) #unique articles
+    #print(voisins_art)
     G = nx.DiGraph()
     liste_sommet = [x.id for x in voisins_art]
 
@@ -91,9 +168,12 @@ def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, d
         if art.references is not None:
             for ref in art.references:
                 if ref in liste_sommet:
+                    #print(art.id, ref)
                     G.add_node(ref)
                     G.add_edge(art.id, ref )
 
+    # print("liste_ref",liste_ref)
+    # print("liste_sommet", liste_sommet)
     if draw_graph:
         nx.draw(G, with_labels=True, arrowsize = 30, width = 2)#, labels=labels)
         
@@ -106,6 +186,10 @@ def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, d
     res_score = [pr[_] for _ in res_id]
     res = art_id(res_id) 
     
+    #print("Here is the top 5 articles recommended\n")
+    #for x in res:
+    #    print("Doi : {} with score {:.2f}".format(x.doi,pr[x.id]))
+    
     for y in pr.keys():
         
         pr[y] *= (10 / sum(res_score) )
@@ -117,6 +201,7 @@ def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, d
         if art.references is not None:
             for ref in art.references:
                 if ref in liste_res:
+                    #print(art.id, ref)
                     
                     res_G.add_node(ref)
                     res_G.add_edge(art.id, ref )
@@ -133,10 +218,12 @@ def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, d
     L_nodes = res_G.nodes
     L_edges = res_G.edges
 
+    print(pr)
+
     recommandation_ouput = {}
-    recommandation_ouput["nodes"] = list( L_nodes )
-    recommandation_ouput["edges"] = json.dumps( list(L_edges) )
-    recommandation_ouput["scores"] = json.dumps( pr )
+    recommandation_ouput["nodes"] = list(L_nodes)
+    recommandation_ouput["edges"] = list(L_edges)
+    recommandation_ouput["scores"] = pr
     
     return recommandation_ouput
 
@@ -271,3 +358,7 @@ def overall_score(L_id = ["53e997e8b7602d9701fe00d3"], i_cocite = 0.2, i_coaut= 
     dic_res = dict(sorted(dic_res.items(), key=lambda item: item[1]))
     
     return dic_res
+            
+    
+    
+print(algofst())
