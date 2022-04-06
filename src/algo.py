@@ -133,9 +133,18 @@ def algofst(L_id:list = ["53e997e8b7602d9701fe00d3"], draw_graph:bool = False, d
     L_nodes = res_G.nodes
     L_edges = res_G.edges
 
+    nodes_with_title = [art.title for art in art_id(L_nodes)]
+    
+    edges_with_title = []
+    for edge in list(L_edges):
+        u, v = edge[0], edge[1]
+        article_u, article_v = art_id([u])[0], art_id([v])[0]
+        edge_with_title = [article_u.title, article_v.title]
+        edges_with_title.append(edge_with_title)
+
     recommandation_ouput = {}
-    recommandation_ouput["nodes"] = list( L_nodes )
-    recommandation_ouput["edges"] = json.dumps( list(L_edges) )
+    recommandation_ouput["nodes"] = nodes_with_title
+    recommandation_ouput["edges"] = json.dumps( edges_with_title )
     recommandation_ouput["scores"] = json.dumps( pr )
     
     return recommandation_ouput
